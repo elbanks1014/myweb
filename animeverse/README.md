@@ -1,0 +1,35 @@
+# AnimeVerse Hub: automatic Reels
+
+Every 4 hours a GitHub Action renders a new **original** 12-second animated Reel (1080x1920 with music) and posts it to the AnimeVerse Hub Facebook Page.
+
+- `content.json`: the posts it rotates through (recs, hot takes, cult classics, questions). Add your own entries. `style` is `sakura`, `powerup` or `warp`.
+- `make_clip.py`: draws the animation and makes the music from scratch, so there is no copyrighted anime footage or audio that could get the Page struck or demonetized.
+- `post_reel.py`: uploads the clip as a Reel through the Facebook Graph API.
+- `../.github/workflows/animeverse-reels.yml`: the every-4-hours schedule.
+
+## One-time setup (about 15 minutes)
+
+1. Go to https://developers.facebook.com, choose **My Apps → Create App**, and pick the **Business** type.
+2. Open **Tools → Graph API Explorer**. Select your app, then **Get Page Access Token**. Grant these permissions: `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`. Choose AnimeVerse Hub.
+3. Turn it into a token that doesn't expire:
+   - Swap it for a long-lived user token: `GET /oauth/access_token?grant_type=fb_exchange_token&client_id=APP_ID&client_secret=APP_SECRET&fb_exchange_token=SHORT_TOKEN`
+   - Then call `GET /me/accounts?access_token=LONG_USER_TOKEN`. The `access_token` listed for AnimeVerse Hub is a Page token that never expires. Also copy its `id`.
+4. In this GitHub repo, go to **Settings → Secrets and variables → Actions** and add:
+   - `FB_PAGE_ID`: the Page id
+   - `FB_PAGE_ACCESS_TOKEN`: the Page token
+5. Merge this into the default branch. Scheduled workflows only run from the default branch.
+6. Test it under **Actions → AnimeVerse Hub Reels → Run workflow**. Tick "dry run" to only render; you can download the clip from the run.
+
+Until the secrets are set, every run is a dry run, so nothing gets posted.
+
+Preview locally: `python make_clip.py --index 0 --out clip.mp4` (needs ffmpeg, Pillow and numpy).
+
+## Making money: what you still have to do yourself
+
+Facebook decides who gets paid, and these steps happen in the app. They can't be automated.
+
+- **Get eligible.** Open **Professional Dashboard → Monetization** to see which programs you qualify for and what's still missing. Facebook's content monetization program (Reels/video earnings) is invite or apply based. Stars and subscriptions usually need a follower count and some recent engagement. Facebook changes the exact thresholds, so check that page rather than relying on a number here.
+- **Grow followers.** At 3 followers, this is the real bottleneck. Posting every day helps, and so does replying to every comment. The clips are written to ask questions on purpose. Share the Reels into anime Facebook groups where the group rules allow it. Pin your best post.
+- **Avoid strikes.** Don't post clips ripped from anime. Copyright claims block monetization. That's why this generator makes original animation.
+- **Affiliate links.** You can add affiliate links (Crunchyroll, manga, figures) to post captions or the Page's About section once you join those programs.
+- **"Advertise" / "Grow your business"** in the app means paying Facebook. Skip it until you have something to sell.
