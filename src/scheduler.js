@@ -23,9 +23,11 @@ export class Store {
 
 // Fires each enabled task every `intervalMinutes`, never overlapping a task with itself.
 export class Scheduler extends EventEmitter {
-  constructor({ store, llm, tickMs = 5_000, crewOptions = {} }) {
+  // `models` maps a model id to { label, llm }; each task picks one by id.
+  constructor({ store, models, defaultModel, tickMs = 5_000, crewOptions = {} }) {
     super();
-    Object.assign(this, { store, llm, tickMs, crewOptions });
+    defaultModel ??= Object.keys(models)[0];
+    Object.assign(this, { store, models, defaultModel, tickMs, crewOptions });
     this.running = new Map(); // taskId -> live run record
     this.timer = null;
   }
@@ -51,14 +53,17 @@ export class Scheduler extends EventEmitter {
     }
   }
 
-  addTask({ name, description = "", intervalMinutes = 60, workers = 2, enabled = true, runImmediately = true }) {
+  addTask({ name, description = "", intervalMinutes = 60, workers = 2, model, enabled = true, runImmediately = true }) {
     if (!name?.trim()) throw new Error("Task name is required.");
+    model ||= this.defaultModel;
+    this.checkModel(model);
     const task = {
       id: randomUUID(),
       name: name.trim(),
       description,
       intervalMinutes: Math.max(1, Number(intervalMinutes) || 60),
       workers: Math.min(5, Math.max(1, Number(workers) || 2)),
+      model,
       enabled,
       createdAt: Date.now(),
       lastRunAt: null,
@@ -74,7 +79,8 @@ export class Scheduler extends EventEmitter {
 
   updateTask(id, patch) {
     const task = this.getTask(id);
-    for (const key of ["name", "description", "intervalMinutes", "workers", "enabled"]) {
+    if ("model" in patch) this.checkModel(patch.model);
+    for (const key of ["name", "description", "intervalMinutes", "workers", "model", "enabled"]) {
       if (key in patch) task[key] = patch[key];
     }
     if (patch.enabled && !task.nextRunAt) task.nextRunAt = Date.now();
@@ -87,6 +93,10 @@ export class Scheduler extends EventEmitter {
     this.store.data.tasks = this.store.data.tasks.filter((t) => t.id !== id);
     this.store.save();
     this.emit("tasks");
+  }
+
+  checkModel(id) {
+    if (!this.models[id]) throw new Error(`Unknown model "${id}". Available: ${Object.keys(this.models).join(", ")}.`);
   }
 
   getTask(id) {
@@ -102,8 +112,10 @@ export class Scheduler extends EventEmitter {
     this.running.set(id, { taskId: id, status: "starting" });
     this.emit("tasks");
 
+    // Tasks saved before models existed (or whose model is gone) use the default.
+    const model = this.models[task.model] ? task.model : this.defaultModel;
     const run = await runCrew(task, {
-      llm: this.llm,
+      llm: this.models[model].llm,
       workers: task.workers,
       ...this.crewOptions,
       onMessage: (m) => this.emit("message", m),
@@ -111,6 +123,7 @@ export class Scheduler extends EventEmitter {
     });
 
     this.running.delete(id);
+    run.model = this.models[model].label;
     task.lastRunAt = run.finishedAt;
     task.lastStatus = run.status;
     this.store.data.runs.unshift(run);

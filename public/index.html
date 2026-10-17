@@ -23,7 +23,7 @@
   section { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 16px; min-width: 0; }
   h2 { font-size: 15px; margin: 0 0 10px; }
   label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 4px; }
-  input, textarea { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; }
+  input, textarea, select { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; }
   textarea { min-height: 70px; resize: vertical; }
   .row { display: flex; gap: 8px; }
   .row > div { flex: 1; }
@@ -68,6 +68,8 @@
           <div><label for="interval">Run every (minutes)</label><input id="interval" type="number" min="1" value="60"></div>
           <div><label for="workers">Workers</label><input id="workers" type="number" min="1" max="5" value="2"></div>
         </div>
+        <label for="model">Model</label>
+        <select id="model"></select>
         <p><button class="primary" type="submit">Add &amp; run now</button></p>
       </form>
     </section>
@@ -96,16 +98,21 @@ const api = (p, opts = {}) => fetch(p, { headers: { "content-type": "application
 const time = (t) => t ? new Date(t).toLocaleString() : "—";
 const dur = (a, b) => a && b ? `${Math.round((b - a) / 1000)}s` : "—";
 
-api("/api/info").then((i) => { $("#mode").textContent = i.mode === "mock" ? "Demo mode (no API key)" : `Claude · ${i.model}`; });
+let modelLabels = {};
+const info = api("/api/info").then((i) => {
+  modelLabels = Object.fromEntries(i.models.map((m) => [m.id, m.label]));
+  $("#model").replaceChildren(...i.models.map((m) => el("option", { value: m.id, textContent: m.label, selected: m.id === i.defaultModel })));
+  $("#mode").textContent = `Default: ${modelLabels[i.defaultModel]}`;
+});
 
 $("#form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const res = await api("/api/tasks", { method: "POST", body: JSON.stringify({
     name: $("#name").value, description: $("#desc").value,
-    intervalMinutes: Number($("#interval").value), workers: Number($("#workers").value),
+    intervalMinutes: Number($("#interval").value), workers: Number($("#workers").value), model: $("#model").value,
   }) });
   if (res.error) return alert(res.error);
-  e.target.reset(); $("#interval").value = 60; $("#workers").value = 2;
+  $("#name").value = ""; $("#desc").value = "";
 });
 
 function renderTasks(tasks) {
@@ -124,7 +131,7 @@ function renderTasks(tasks) {
     del.onclick = () => confirm(`Delete "${t.name}"?`) && api(`/api/tasks/${t.id}`, { method: "DELETE" });
     box.append(el("div", { className: "task" },
       el("div", { className: "name", textContent: t.name }), " ", status,
-      el("div", { className: "muted", textContent: `Every ${t.intervalMinutes} min · ${t.workers} worker(s) · ${t.enabled ? `next ${time(t.nextRunAt)}` : "paused"}` }),
+      el("div", { className: "muted", textContent: `${modelLabels[t.model] || "Default model"} · every ${t.intervalMinutes} min · ${t.workers} worker(s) · ${t.enabled ? `next ${time(t.nextRunAt)}` : "paused"}` }),
       el("div", { className: "actions" }, run, toggle, del)));
   }
 }
@@ -164,13 +171,13 @@ async function showRun(id) {
   const stalls = r.messages.filter((m) => ["nudge", "intervene", "handoff"].includes(m.type)).length;
   $("#detail").replaceChildren(
     el("h2", { textContent: `${r.taskName} — ${r.status}`, style: "margin-top:14px" }),
-    el("div", { className: "muted", textContent: `${r.steps.length} steps · ${r.messages.length} messages · ${stalls} supervisor interventions` }),
+    el("div", { className: "muted", textContent: `${r.model ? r.model + " · " : ""}${r.steps.length} steps · ${r.messages.length} messages · ${stalls} supervisor interventions` }),
     r.error ? el("p", { className: "failed", textContent: r.error }) : "",
     el("pre", { textContent: r.result || "(no final result)" }));
 }
 
 const events = new EventSource("/api/events");
-events.addEventListener("tasks", (e) => renderTasks(JSON.parse(e.data)));
+events.addEventListener("tasks", (e) => info.then(() => renderTasks(JSON.parse(e.data))));
 events.addEventListener("message", (e) => addMessage(JSON.parse(e.data)));
 events.addEventListener("run", (e) => renderLive(JSON.parse(e.data)));
 loadRuns();

@@ -50,5 +50,5 @@ export class Supervisor {
 }
 
 function fmt(ms) {
-  return ms >= 60_000 ? `${Math.round(ms / 60_000)}m` : `${Math.round(ms / 1000)}s`;
+  return ms >= 120_000 ? `${Math.round(ms / 60_000)}m` : `${Math.round(ms / 1000)}s`;
 }

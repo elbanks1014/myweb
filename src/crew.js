@@ -59,7 +59,7 @@ export async function runCrew(task, { llm, onMessage, onUpdate, workers = 2, max
 
   try {
     // 1. Plan
-    const plan = await planner.think({
+    const plan = await retryOnStall(planner, bus, {
       work: "planning",
       schema: PLAN_SCHEMA,
       prompt: `${taskText}\n\nBreak this task into 2-6 ordered steps. Each step must be something one worker can complete in a single response.`,
@@ -98,7 +98,7 @@ export async function runCrew(task, { llm, onMessage, onUpdate, workers = 2, max
           throw err;
         }
 
-        const review = await reviewer.think({
+        const review = await retryOnStall(reviewer, bus, {
           work: `reviewing step ${i + 1}`,
           schema: REVIEW_SCHEMA,
           prompt: `${taskText}\n\nSTEP: ${step.title}\nINSTRUCTIONS: ${step.instructions}\n\nOUTPUT FROM ${worker.name}:\n${output}\n\nApprove if the output fully completes the step. Otherwise give specific feedback.`,
@@ -121,7 +121,7 @@ export async function runCrew(task, { llm, onMessage, onUpdate, workers = 2, max
     }
 
     // 3. Final report
-    run.result = await planner.think({
+    run.result = await retryOnStall(planner, bus, {
       work: "writing the final report",
       prompt: `${taskText}\n\nYour team finished every step. Write the final report: the finished deliverable for the task, built from the step outputs below.\n\n${run.steps.map((s, j) => `## Step ${j + 1}: ${s.title}\n${s.output}`).join("\n\n")}`,
     });
@@ -137,4 +137,18 @@ export async function runCrew(task, { llm, onMessage, onUpdate, workers = 2, max
     onUpdate?.(run);
   }
   return run;
+}
+
+// The planner and reviewer have no stand-in, so when the supervisor stops one
+// for stalling, the same agent simply tries again (up to `retries` times).
+async function retryOnStall(agent, bus, args, retries = 2) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await agent.think(args);
+    } catch (err) {
+      if (err.abortReason !== "stalled") throw err;
+      if (attempt >= retries) throw new Error(`${agent.name} stalled ${attempt + 1} times while ${args.work}.`);
+      bus.send({ from: "Supervisor", to: agent.name, type: "handoff", content: `${agent.name}, starting ${args.work} over after the stall.` });
+    }
+  }
 }

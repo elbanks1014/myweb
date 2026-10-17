@@ -2,18 +2,19 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createLLM, MockLLM } from "./llm.js";
+import { createModels } from "./llm.js";
 import { Store, Scheduler, summarize } from "./scheduler.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
 const DATA_FILE = process.env.DATA_FILE || path.join(here, "..", "data", "db.json");
 
-const llm = createLLM();
+const { models, defaultModel } = createModels();
 const store = new Store(DATA_FILE);
 const scheduler = new Scheduler({
   store,
-  llm,
+  models,
+  defaultModel,
   crewOptions: {
     stallMs: Number(process.env.STALL_SECONDS || 90) * 1000,
     runStallMs: Number(process.env.RUN_STALL_MINUTES || 15) * 60_000,
@@ -61,7 +62,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (url.pathname === "/api/info") {
-      return send(res, 200, { mode: llm instanceof MockLLM ? "mock" : "claude", model: llm.model || null });
+      return send(res, 200, { defaultModel, models: Object.entries(models).map(([id, m]) => ({ id, label: m.label })) });
     }
     if (parts[0] === "api" && parts[1] === "tasks") {
       const id = parts[2];
@@ -88,6 +89,6 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   scheduler.start();
-  const mode = llm instanceof MockLLM ? "MOCK mode (set ANTHROPIC_API_KEY to use Claude)" : `Claude (${llm.model})`;
-  console.log(`Agent Crew running at http://localhost:${PORT} — ${mode}`);
+  console.log(`Agent Crew running at http://localhost:${PORT}`);
+  console.log(`Models: ${Object.values(models).map((m) => m.label).join(", ")} — default for new tasks: ${models[defaultModel].label}`);
 });
