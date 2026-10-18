@@ -1,0 +1,50 @@
+name: AnimeVerse Hub Fights
+
+on:
+  schedule:
+    - cron: "47 */4 * * *"   # every 4 hours, half-way between the Reels
+  workflow_dispatch:
+    inputs:
+      style:
+        description: "Fight style"
+        type: choice
+        options: [mix, stick, power, sword]
+        default: mix
+      dry_run:
+        description: "Render only, don't post"
+        type: boolean
+        default: false
+
+concurrency: animeverse-fights
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-dejavu-core
+      - run: pip install pillow numpy
+      - name: Render 7 minute fight
+        working-directory: animeverse
+        run: python fight.py --style "${{ inputs.style || 'mix' }}" --out fight.mp4 > fight.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fight
+          path: animeverse/fight.mp4
+          retention-days: 3
+      - name: Post video to Facebook
+        working-directory: animeverse
+        env:
+          FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+          FB_PAGE_ACCESS_TOKEN: ${{ secrets.FB_PAGE_ACCESS_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
+        run: |
+          if [ "$DRY_RUN" != 1 ] && { [ -z "$FB_PAGE_ID" ] || [ -z "$FB_PAGE_ACCESS_TOKEN" ]; }; then
+            echo "::error::FB_PAGE_ID or FB_PAGE_ACCESS_TOKEN repository secret is missing, so nothing was posted"
+            exit 1
+          fi
+          python post_video.py fight.mp4 fight.json

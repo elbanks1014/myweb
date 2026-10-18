@@ -7,6 +7,14 @@ Every 4 hours a GitHub Action renders a new **original** 12-second animated Reel
 - `post_reel.py`: uploads the clip as a Reel through the Facebook Graph API.
 - `../.github/workflows/animeverse-reels.yml`: the every-4-hours schedule.
 
+It also posts a **7 minute fight video** every 4 hours, half-way between the Reels:
+
+- `fight.py`: makes a random best-of-three fight. Each video picks one of three styles at random (stick figure fight, power battle with energy blasts and beam clashes, or silhouette sword duel), plus two fighter names and a new choreography. It also adds health bars, round cards, a K.O. screen, battle music and sound effects, all generated from scratch.
+- `post_video.py`: uploads it as a regular Page video. Facebook only allows Reels up to 90 seconds.
+- `../.github/workflows/animeverse-fights.yml`: the schedule. To make one by hand, use **Run workflow** and pick a style, or tick "dry run" to only render it.
+
+Preview a short one locally: `python fight.py --style sword --duration 60 --out fight.mp4`.
+
 ## One-time setup (about 15 minutes)
 
 1. Go to https://developers.facebook.com, choose **My Apps → Create App**, and pick the **Business** type.
