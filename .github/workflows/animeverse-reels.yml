@@ -35,5 +35,10 @@ jobs:
         env:
           FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
           FB_PAGE_ACCESS_TOKEN: ${{ secrets.FB_PAGE_ACCESS_TOKEN }}
-          DRY_RUN: ${{ (inputs.dry_run || secrets.FB_PAGE_ACCESS_TOKEN == '') && '1' || '0' }}
-        run: python post_reel.py clip.mp4 post.json
+          DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
+        run: |
+          if [ "$DRY_RUN" != 1 ] && { [ -z "$FB_PAGE_ID" ] || [ -z "$FB_PAGE_ACCESS_TOKEN" ]; }; then
+            echo "::error::FB_PAGE_ID or FB_PAGE_ACCESS_TOKEN repository secret is missing, so nothing was posted"
+            exit 1
+          fi
+          python post_reel.py clip.mp4 post.json

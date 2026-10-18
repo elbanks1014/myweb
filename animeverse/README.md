@@ -20,7 +20,7 @@ Every 4 hours a GitHub Action renders a new **original** 12-second animated Reel
 5. Merge this into the default branch. Scheduled workflows only run from the default branch.
 6. Test it under **Actions → AnimeVerse Hub Reels → Run workflow**. Tick "dry run" to only render; you can download the clip from the run.
 
-Until the secrets are set, every run is a dry run, so nothing gets posted.
+If either secret is missing, the run fails with a red X instead of quietly posting nothing.
 
 Preview locally: `python make_clip.py --index 0 --out clip.mp4` (needs ffmpeg, Pillow and numpy).
 
