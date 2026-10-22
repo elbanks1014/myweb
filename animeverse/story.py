@@ -244,13 +244,19 @@ ART_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "art", "chars
 CAST = {
     "fantasy": [("Kael", "kael", (130, 80, 210)), ("Seris", "seris", (80, 140, 220)), ("Riven", "riven", (220, 100, 40))],
     "school": [("Haruto", "haruto", (150, 95, 55)), ("Aoi", "aoi", (120, 70, 180)), ("Mina", "mina", (235, 135, 80))],
-    "scifi": [("Nova", "nova", (30, 160, 220)), ("Rook", "rook", (210, 50, 60))],
+    "scifi": [("Nova", "nova", (30, 160, 220)), ("Rook", "rook", (210, 50, 60)), ("Iris", "iris", (110, 170, 230))],
+    "yokai": [("Shiro", "shiro", (200, 60, 50)), ("Ren", "ren", (50, 70, 140)), ("Sayo", "sayo", (190, 40, 60))],
 }
 
 
 def available_cast():
-    return {g: c for g, c in CAST.items()
-            if all(os.path.exists(os.path.join(ART_DIR, f + ".png")) for _, f, _ in c)}
+    """Genres with at least two characters whose art exists."""
+    out = {}
+    for g, c in CAST.items():
+        have = [x for x in c if os.path.exists(os.path.join(ART_DIR, x[1] + ".png"))]
+        if len(have) >= 2:
+            out[g] = have
+    return out
 
 
 def write_story(rng):
