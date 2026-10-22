@@ -21,7 +21,7 @@ import time
 import wave
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 W, H, FPS, SR = 1080, 1920, 30, 44100
 FONT_PATHS = ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
@@ -238,13 +238,34 @@ def make_character(rng, name, genre, avoid=None):
             return c
 
 
+# Recurring cast drawn as AI art (art/chars/*.png, cut out by art/key.py): (name, file, name-tag/aura color).
+# Genres with a cast use it; the drawn characters are only a fallback when no art is available.
+ART_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "art", "chars")
+CAST = {
+    "fantasy": [("Kael", "kael", (130, 80, 210)), ("Seris", "seris", (80, 140, 220)), ("Riven", "riven", (220, 100, 40))],
+    "school": [("Haruto", "haruto", (150, 95, 55)), ("Aoi", "aoi", (120, 70, 180)), ("Mina", "mina", (235, 135, 80))],
+    "scifi": [("Nova", "nova", (30, 160, 220)), ("Rook", "rook", (210, 50, 60))],
+}
+
+
+def available_cast():
+    return {g: c for g, c in CAST.items()
+            if all(os.path.exists(os.path.join(ART_DIR, f + ".png")) for _, f, _ in c)}
+
+
 def write_story(rng):
-    genre = rng.choice(list(GENRES))
+    cast = available_cast()
+    genre = rng.choice(sorted(cast) if cast else list(GENRES))
     g = GENRES[genre]
-    a_name, b_name = rng.sample(FIRST_NAMES, 2)
-    A = make_character(rng, a_name, genre)
-    B = make_character(rng, b_name, genre, avoid=A)
-    if genre == "yokai":
+    if genre in cast:
+        (a_name, a_file, a_col), (b_name, b_file, b_col) = rng.sample(cast[genre], 2)
+        A = dict(name=a_name, sprite=os.path.join(ART_DIR, a_file + ".png"), hair=a_col, accent=a_col)
+        B = dict(name=b_name, sprite=os.path.join(ART_DIR, b_file + ".png"), hair=b_col, accent=b_col)
+    else:
+        a_name, b_name = rng.sample(FIRST_NAMES, 2)
+        A = make_character(rng, a_name, genre)
+        B = make_character(rng, b_name, genre, avoid=A)
+    if genre == "yokai" and "sprite" not in B:
         B["extra"] = "foxears"
         B["hair"] = rng.choice([(235, 235, 245), (250, 170, 80), (220, 225, 240)])
     place, bg = rng.choice(g["places"])
@@ -253,7 +274,7 @@ def write_story(rng):
     villain = rng.choice(g["villains"]) if g["villains"] else None
     slots = dict(A=a_name, B=b_name, V=villain or "", place=place, item=item, ItemTitle=item_title,
                  power=power, POWER=power.upper(), Power=power.title(),
-                 PlaceTitle=place.replace("the ", "").title())
+                 PlaceTitle=place.replace("the ", "").title().replace(" Of ", " of ").replace(" At ", " at "))
     lines = []
     for beat, options in enumerate(g["beats"]):
         for ln in rng.choice(options):
@@ -717,10 +738,82 @@ class Renderer:
         self.s = story
         self.seed = seed
         self.bg = make_bg(story["bg"], random.Random(seed))
+        self.sprites = {k: self.load_sprite(story[k], k == "B") for k in ("A", "B") if "sprite" in story[k]}
+        if self.sprites:
+            # soft focus on the scenery so the detailed character art stands out
+            self.bg = self.bg.filter(ImageFilter.GaussianBlur(5)).point(lambda v: int(v * 0.8))
         self.part = PARTICLES[story["bg"]]
         self.dlg_font = font(46)
         self.total = build_timeline(story)
         self.v_first = next((ln["t0"] for ln in story["lines"] if ln["speaker"] == "V"), None)
+
+    def draw_smoky_villain(self, img, d, cy, t, alpha):
+        """A blurred shadow figure with sharp glowing eyes, to sit with the painted character art."""
+        if alpha <= 0:
+            return
+        if not hasattr(self, "villain_layer"):
+            layer = Image.new("RGBA", (W, 1300))
+            draw_villain(ImageDraw.Draw(layer, "RGBA"), W / 2, 420, 190, 0.0, 1.0)
+            self.villain_layer = layer.filter(ImageFilter.GaussianBlur(9))
+        a = self.villain_layer.getchannel("A").point(lambda v: int(v * alpha))
+        img.paste(self.villain_layer, (0, int(cy - 420)), a)
+        glow = 0.7 + 0.3 * math.sin(t * 5)
+        for s_ in (-1, 1):
+            ex, ey = W / 2 + s_ * 190 * 0.35, cy - 190 * 0.03
+            for r, al in ((38, 50), (22, 110)):
+                d.ellipse((ex - r * 1.6, ey - r * 0.6, ex + r * 1.6, ey + r * 0.6), fill=(255, 30, 50, int(al * alpha * glow)))
+            d.polygon([(ex - s_ * 55, ey + 8), (ex + s_ * 45, ey - 14), (ex + s_ * 40, ey + 6)],
+                      fill=(255, 90, 100, int(255 * alpha * glow)))
+
+    @staticmethod
+    def load_sprite(c, mirror):
+        img = Image.open(c["sprite"]).convert("RGBA")
+        hgt = 1180
+        img = img.resize((int(img.width * hgt / img.height), hgt), Image.LANCZOS)
+        if mirror:
+            img = ImageOps.mirror(img)
+        r, g, b, a = img.split()
+        dim = Image.merge("RGBA", [ch.point(lambda v: int(v * 0.45)) for ch in (r, g, b)] + [a])
+        big = img.resize((int(img.width * 1.05), int(img.height * 1.05)), Image.LANCZOS)
+        glow_a = a.filter(ImageFilter.MaxFilter(9)).filter(ImageFilter.GaussianBlur(28)).point(lambda v: int(v * 0.85))
+        glow = Image.new("RGBA", big.size, c["accent"] + (0,))
+        glow.putalpha(glow_a.resize(big.size))
+        return dict(normal=img, dim=dim, big=big, glow=glow)
+
+    def draw_sprites(self, img, ln, t):
+        """Paste the AI character art: the speaker steps forward and lights up, the other dims."""
+        enter = ease((t - TITLE_DUR * 0.6) / (TITLE_DUR * 0.4 + 0.4))
+        order = ["A", "B"]
+        if ln and ln["speaker"] == "A":
+            order = ["B", "A"]
+        for key in order:
+            sp = self.sprites[key]
+            speaking = ln is not None and ln["speaker"] == key
+            dim = ln is not None and ln["speaker"] not in (key, "N")
+            pic = sp["big"] if speaking else sp["dim"] if dim else sp["normal"]
+            cx = (330 if key == "A" else 750) + (1 - enter) * (-700 if key == "A" else 700)
+            if speaking:
+                cx += 40 if key == "A" else -40
+            y = H - 40 - pic.height + math.sin(t * 2.0 + (0 if key == "A" else 1.7)) * 5
+            if speaking and t - ln["t0"] < len(ln["text"]) / CPS:
+                y -= abs(math.sin((t - ln["t0"]) * 9)) * 7
+            if ln and ln["fx"] in ("shock", "flash") and t - ln["t0"] < 0.4:
+                r = random.Random(int(t * FPS) + (7 if key == "B" else 0))
+                cx += r.uniform(-12, 12)
+            x = int(cx - pic.width / 2)
+            if speaking and ln["fx"] == "aura":
+                gl = sp["glow"]
+                flick = 0.75 + 0.25 * math.sin(t * 12)
+                img.paste(gl, (x, int(y)), gl.getchannel("A").point(lambda v: int(v * flick)))
+            img.paste(pic, (x, int(y)), pic)
+            if speaking and ln["fx"] == "sparkle":
+                d = ImageDraw.Draw(img, "RGBA")
+                for k in range(6):
+                    a = t * 1.5 + k * 1.05
+                    sx, sy = cx + math.cos(a) * 260, 900 + math.sin(a * 1.3) * 200
+                    sz = 16 + 8 * math.sin(t * 6 + k)
+                    d.polygon([(sx, sy - sz), (sx + sz * 0.3, sy), (sx, sy + sz), (sx - sz * 0.3, sy)], fill=(255, 255, 255, 230))
+                    d.polygon([(sx - sz, sy), (sx, sy + sz * 0.3), (sx + sz, sy), (sx, sy - sz * 0.3)], fill=(255, 255, 255, 230))
 
     def line_at(self, t):
         cur = None
@@ -753,10 +846,16 @@ class Renderer:
             alpha = min(1, (t - self.v_first) / 0.8) * (0.35 if last_beat >= 6 else 1.0)
             if ln and ln["speaker"] != "V":
                 alpha *= 0.7
-            draw_villain(d, W / 2, 560 + math.sin(t * 1.2) * 15, 170, t, alpha)
+            if self.sprites:
+                self.draw_smoky_villain(img, d, 560 + math.sin(t * 1.2) * 15, t, alpha)
+            else:
+                draw_villain(d, W / 2, 560 + math.sin(t * 1.2) * 15, 170, t, alpha)
 
         # characters
-        if t >= TITLE_DUR * 0.6:
+        if self.sprites and t >= TITLE_DUR * 0.6:
+            self.draw_sprites(img, ln, t)
+            d = ImageDraw.Draw(img, "RGBA")
+        elif t >= TITLE_DUR * 0.6:
             for key, cx, flip in (("A", 290, False), ("B", 790, True)):
                 c = s[key]
                 speaking = ln is not None and ln["speaker"] == key
