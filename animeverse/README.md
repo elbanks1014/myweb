@@ -1,15 +1,15 @@
 # AnimeVerse Hub: automatic Reels
 
-Every 4 hours a GitHub Action renders a new **original** 12-second animated Reel (1080x1920 with music) and posts it to the AnimeVerse Hub Facebook Page.
+Every 4 hours a GitHub Action makes a new **original anime story short** (a 45–60 second Reel, 1080x1920) and posts it to the AnimeVerse Hub Facebook Page.
 
-- `content.json`: the posts it rotates through (recs, hot takes, cult classics, questions). Add your own entries. `style` is `sakura`, `powerup` or `warp`.
-- `make_clip.py`: draws the animation and makes the music from scratch, so there is no copyrighted anime footage or audio that could get the Page struck or demonetized.
+- `story.py`: writes and animates the story. It invents two characters each time (name, hair, eyes, outfit, accessory) and picks a genre (fantasy, school, sci-fi or spirit mystery) and a setting. It builds a seven-beat plot from a built-in bank of story pieces, with a looming villain in most genres. The story plays visual-novel style: the characters blink, talk and react, and it adds narration, effects, music and per-character voice blips. Everything is drawn and generated from scratch, so there is no copyrighted footage or audio, and no AI service or API key is needed. To add variety, add more options to the `GENRES` bank at the top of the file.
 - `post_reel.py`: uploads the clip as a Reel through the Facebook Graph API.
-- `../.github/workflows/animeverse-reels.yml`: the every-4-hours schedule.
+- `../.github/workflows/animeverse-reels.yml` ("AnimeVerse Hub Story Shorts"): the every-4-hours schedule.
+- `make_clip.py` and `content.json`: the old 12-second quote Reels. They're no longer scheduled; to switch back, change the workflow's render step to `python make_clip.py --out clip.mp4`.
 
 It also posts a **7 minute fight video** every 4 hours, half-way between the Reels:
 
-- `fight.py`: makes a random best-of-three fight. Each video picks one of three styles at random (stick figure fight, power battle with energy blasts and beam clashes, or silhouette sword duel), plus two fighter names and a new choreography. It also adds health bars, round cards, a K.O. screen, battle music and sound effects, all generated from scratch.
+- `fight.py`: makes a random best-of-three fight. Each video is either a power battle with energy blasts and beam clashes or a silhouette sword duel (the stick figure style only runs with `--style stick`), plus two fighter names and a new choreography. It also adds health bars, round cards, a K.O. screen, battle music and sound effects, all generated from scratch.
 - `post_video.py`: uploads it as a regular Page video. Facebook only allows Reels up to 90 seconds.
 - `../.github/workflows/animeverse-fights.yml`: the schedule. To make one by hand, use **Run workflow** and pick a style, or tick "dry run" to only render it.
 
@@ -26,11 +26,11 @@ Preview a short one locally: `python fight.py --style sword --duration 60 --out 
    - `FB_PAGE_ID`: the Page id
    - `FB_PAGE_ACCESS_TOKEN`: the Page token
 5. Merge this into the default branch. Scheduled workflows only run from the default branch.
-6. Test it under **Actions → AnimeVerse Hub Reels → Run workflow**. Tick "dry run" to only render; you can download the clip from the run.
+6. Test it under **Actions → AnimeVerse Hub Story Shorts → Run workflow**. Tick "dry run" to only render; you can download the clip from the run.
 
 If either secret is missing, the run fails with a red X instead of quietly posting nothing.
 
-Preview locally: `python make_clip.py --index 0 --out clip.mp4` (needs ffmpeg, Pillow and numpy).
+Preview locally: `python story.py --seed 1 --out clip.mp4` (needs ffmpeg, Pillow and numpy).
 
 ## Making money: what you still have to do yourself
 
