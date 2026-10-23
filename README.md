@@ -32,9 +32,16 @@ Requires Node.js 20+.
 
 ```bash
 npm install
-export ANTHROPIC_API_KEY=sk-ant-...   # your Claude API key
-npm start                             # open http://localhost:3000
+npm start          # then open http://localhost:3000
 ```
+
+To use Claude, set your API key before `npm start`:
+
+| Windows (Command Prompt) | Windows (PowerShell) | Mac / Linux |
+|---|---|---|
+| `set ANTHROPIC_API_KEY=sk-ant-...` | `$env:ANTHROPIC_API_KEY="sk-ant-..."` | `export ANTHROPIC_API_KEY=sk-ant-...` |
+
+The other settings below are set the same way.
 
 No API key yet? `npm run demo` runs the whole app with simulated agents so you can see how it works.
 

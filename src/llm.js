@@ -172,7 +172,9 @@ export function createModels() {
   models.free = { label: `Free (${free.model})`, llm: free };
   models.demo = { label: "Demo (simulated agents)", llm: new MockLLM() };
 
-  const wanted = { claude: "claude", free: "free", mock: "demo" }[process.env.AGENT_MODE];
+  // `--demo` instead of AGENT_MODE=mock so `npm run demo` works in the Windows command prompt too.
+  const mode = process.argv.includes("--demo") ? "mock" : process.env.AGENT_MODE;
+  const wanted = { claude: "claude", free: "free", mock: "demo" }[mode];
   const defaultModel = wanted && models[wanted] ? wanted : hasKey ? "claude" : process.env.FREE_LLM_URL ? "free" : "demo";
   return { models, defaultModel };
 }
