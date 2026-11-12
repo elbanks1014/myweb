@@ -8,11 +8,11 @@ Every 4 hours a GitHub Action makes a new **original anime story short** (a 45â€
 - `../.github/workflows/animeverse-reels.yml` ("AnimeVerse Hub Story Shorts"): the every-4-hours schedule.
 - `make_clip.py` and `content.json`: the old 12-second quote Reels. They're no longer scheduled; to switch back, change the workflow's render step to `python make_clip.py --out clip.mp4`.
 
-It also posts a **7 minute fight video** every 4 hours, half-way between the Reels:
+It can also post a **7 minute fight video**. Automatic posting is **turned off**; post one by hand with **Run workflow** (see below), or add the schedule back to the workflow file to post every 4 hours again:
 
 - `fight.py`: makes a random best-of-three fight. Each video is either a power battle with energy blasts and beam clashes or a silhouette sword duel (the stick figure style only runs with `--style stick`), plus two fighter names and a new choreography. It also adds health bars, round cards, a K.O. screen, battle music and sound effects, all generated from scratch.
 - `post_video.py`: uploads it as a regular Page video. Facebook only allows Reels up to 90 seconds.
-- `../.github/workflows/animeverse-fights.yml`: the schedule. To make one by hand, use **Run workflow** and pick a style, or tick "dry run" to only render it.
+- `../.github/workflows/animeverse-fights.yml`: the workflow (manual only). To make one by hand, use **Run workflow** and pick a style, or tick "dry run" to only render it.
 
 Preview a short one locally: `python fight.py --style sword --duration 60 --out fight.mp4`.
 
