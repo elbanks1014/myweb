@@ -1,6 +1,7 @@
 """Render a random, original ~7 minute anime fight video (1280x720, 24fps, music + sound effects).
 
-Each video picks a style (stick figure, power battle or sword duel), two fighters
+Each video picks a style (power battle or sword duel; stick figure only when asked
+for with --style stick), two fighters
 and a random best-of-three fight choreography. Everything is drawn and
 synthesized from scratch, so there is no copyrighted footage or audio.
 
@@ -1142,7 +1143,7 @@ def main():
     args = ap.parse_args()
     seed = args.seed if args.seed is not None else time.time_ns() % 2**31
     rng = random.Random(seed)
-    style = args.style if args.style != "mix" else rng.choice(["stick", "power", "sword"])
+    style = args.style if args.style != "mix" else rng.choice(["power", "sword"])
     names = rng.sample(NAMES, 2)
     fight = Fight(rng, style, names, args.duration)
     fight.build()

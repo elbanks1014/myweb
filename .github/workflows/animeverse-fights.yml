@@ -8,7 +8,7 @@ on:
       style:
         description: "Fight style"
         type: choice
-        options: [mix, stick, power, sword]
+        options: [mix, power, sword]
         default: mix
       dry_run:
         description: "Render only, don't post"

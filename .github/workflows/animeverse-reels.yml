@@ -1,4 +1,4 @@
-name: AnimeVerse Hub Reels
+name: AnimeVerse Hub Story Shorts
 
 on:
   schedule:
@@ -22,9 +22,9 @@ jobs:
           python-version: "3.12"
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-dejavu-core
       - run: pip install pillow numpy
-      - name: Render clip
+      - name: Render story short
         working-directory: animeverse
-        run: python make_clip.py --out clip.mp4 > post.json
+        run: python story.py --out clip.mp4 > post.json
       - uses: actions/upload-artifact@v4
         with:
           name: clip
