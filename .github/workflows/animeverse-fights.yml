@@ -1,8 +1,10 @@
 name: AnimeVerse Hub Fights
 
+# Automatic posting is turned off; run it by hand from the Actions tab.
+# To post every 4 hours again, add back under "on:":
+#   schedule:
+#     - cron: "47 */4 * * *"
 on:
-  schedule:
-    - cron: "47 */4 * * *"   # every 4 hours, half-way between the Reels
   workflow_dispatch:
     inputs:
       style:

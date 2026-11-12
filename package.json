@@ -6,8 +6,8 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "demo": "AGENT_MODE=mock node src/server.js",
-    "test": "AGENT_MODE=mock node --test test/*.test.js"
+    "demo": "node src/server.js --demo",
+    "test": "node --test test/*.test.js"
   },
   "engines": { "node": ">=20" },
   "dependencies": {
